@@ -976,17 +976,17 @@ def display():
     if GAME_OVER:
         # Display game over screen
         glPushMatrix()
-        glTranslated(0, 3, 0)
+        glTranslated(0, 2, 0)
         glRotated(aa, 0, 1, 0)
         glScaled(1.5, 1.5, 1.5)
         plane()
         glPopMatrix()
 
-        draw_stroke_text2("GAME OVER", -2, 0.5, 0)
-        draw_stroke_text("Press G to Restart or M for Main Menu", -3.5, -1, 0)
+        draw_stroke_text2("GAME OVER", -2, -0.5, 0)
+        draw_stroke_text("Press G to Restart or M for Main Menu", -3.5, -1.5, 0)
 
         # Display final score and time
-        draw_stroke_text("TIME : ", -1, -1.5, 0)
+        draw_stroke_text("TIME : ", -1, -2, 0)
         time_val = TIME
         digits = []
         if time_val == 0:
@@ -999,10 +999,10 @@ def display():
 
         tmp = 0.0
         for digit in digits:
-            draw_stroke_char(str(digit), 0.0 + tmp, -1.5, 0)
+            draw_stroke_char(str(digit), 0.0 + tmp, -2, 0)
             tmp += 0.2
 
-        draw_stroke_text("SCORE : ", -1, -2, 0)
+        draw_stroke_text("SCORE : ", -1, -2.5, 0)
         score_val = SCORE
         score_digits = []
         if score_val == 0:
@@ -1015,7 +1015,7 @@ def display():
 
         tmp = 0.0
         for digit in score_digits:
-            draw_stroke_char(str(digit), 0.3 + tmp, -2, 0)
+            draw_stroke_char(str(digit), 0.3 + tmp, -2.5, 0)
             tmp += 0.2
 
     elif START:
