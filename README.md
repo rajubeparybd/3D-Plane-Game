@@ -60,13 +60,15 @@ python -m src.main
 ### During Gameplay
 | Key | Action |
 |-----|--------|
-| `W` | Pitch Down (Move Up) |
-| `S` | Pitch Up (Move Down) |
-| `A` | Bank Left (Move Left) |
-| `D` | Bank Right (Move Right) |
+| `Arrow Up` | Pitch Down (Move Up) |
+| `Arrow Down` | Pitch Up (Move Down) |
+| `Arrow Left` | Bank Left (Move Left) |
+| `Arrow Right` | Bank Right (Move Right) |
 | `M` | Return to Main Menu |
-| `Z` | Zoom In |
-| `Shift+Z` | Zoom Out |
+| `+` or `=` | Zoom In |
+| `-` | Zoom Out |
+| `Mouse Wheel Up` | Zoom In |
+| `Mouse Wheel Down` | Zoom Out |
 | `R` | Enable Auto-Rotation |
 | `T` | Disable Auto-Rotation |
 | `Q` or `ESC` | Quit Game |
@@ -96,7 +98,7 @@ python -m src.main
 - **Environment System**: Procedural city generation with buildings and monuments
 - **Physics Engine**: Rotation, translation, and stabilization mechanics
 - **Rendering Pipeline**: OpenGL display with lighting and depth testing
-- **Input Handler**: Keyboard controls with smooth response
+- **Input Handler**: Arrow key and mouse wheel controls with smooth response
 - **UI System**: Stroke text rendering for menus and HUD
 
 #### `src/rgbpixmap.py` - Texture Manager

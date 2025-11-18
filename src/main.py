@@ -897,16 +897,20 @@ def display():
         draw()
         glPopMatrix()
         
-        draw_stroke_text("UP: W, DOWN: S, LEFT: A, RIGHT: D, MAIN MENU: M", -8, 0.9, 0)
+        draw_stroke_text("ARROW KEYS: Move Plane, +/- or Mouse Wheel: Zoom, MAIN MENU: M", -8, 0.9, 0)
         draw_stroke_text("TIME : ", 3, 0, 0)
-        
+
         # Draw time digits
         time_val = TIME
         digits = []
-        while time_val > 0:
-            digits.append(time_val % 10)
-            time_val //= 10
-        
+        if time_val == 0:
+            digits.append(0)
+        else:
+            while time_val > 0:
+                digits.append(time_val % 10)
+                time_val //= 10
+            digits.reverse()  # Reverse to show correct order
+
         tmp = 0.0
         for digit in digits:
             draw_stroke_char(str(digit), 4 + tmp, 0, 0)
@@ -939,29 +943,52 @@ def key(key_char: bytes, x: int, y: int):
         rot = True
     elif key_str == 't':
         rot = False
-    elif key_str == 'z':
+    elif key_str == '+' or key_str == '=':
         zoom += 0.05
-    elif key_str == 'Z':
+    elif key_str == '-' or key_str == '_':
         zoom -= 0.05
-    elif key_str == 'w':
-        tY -= frac
-        rotZ += rot_frac
-    elif key_str == 's':
-        tY += frac
-        rotZ -= rot_frac
-    elif key_str == 'a':
-        tX += frac
-        rotX -= rot_frac * 3
-        rotY += rot_frac / 2
-    elif key_str == 'd':
-        tX -= frac
-        rotX += rot_frac * 3
-        rotY -= rot_frac / 2
     elif key_str == 'g':
         START = True
     elif key_str == 'm':
         START = False
     
+    glutPostRedisplay()
+
+
+def special_key(key: int, x: int, y: int):
+    """Special keyboard callback function for arrow keys"""
+    global tY, tX, rotX, rotY, rotZ
+
+    frac = 0.3
+    rot_frac = 1.0
+
+    if key == GLUT_KEY_UP:
+        tY -= frac
+        rotZ += rot_frac
+    elif key == GLUT_KEY_DOWN:
+        tY += frac
+        rotZ -= rot_frac
+    elif key == GLUT_KEY_LEFT:
+        tX += frac
+        rotX -= rot_frac * 3
+        rotY += rot_frac / 2
+    elif key == GLUT_KEY_RIGHT:
+        tX -= frac
+        rotX += rot_frac * 3
+        rotY -= rot_frac / 2
+
+    glutPostRedisplay()
+
+
+def mouse_wheel(button: int, direction: int, x: int, y: int):
+    """Mouse callback function for zoom control with mouse wheel"""
+    global zoom
+
+    if button == 3:  # Scroll up
+        zoom += 0.05
+    elif button == 4:  # Scroll down
+        zoom -= 0.05
+
     glutPostRedisplay()
 
 
@@ -994,6 +1021,8 @@ def main():
     glutReshapeFunc(resize)
     glutDisplayFunc(display)
     glutKeyboardFunc(key)
+    glutSpecialFunc(special_key)
+    glutMouseFunc(mouse_wheel)
     glutIdleFunc(idle)
     
     glClearColor(1, 1, 1, 1)
