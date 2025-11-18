@@ -48,9 +48,12 @@ r = [0.1, 0.4, 0.0, 0.9, 0.2, 0.5, 0.0, 0.7, 0.5, 0.0]
 g = [0.2, 0.0, 0.4, 0.5, 0.2, 0.0, 0.3, 0.9, 0.0, 0.2]
 b = [0.4, 0.5, 0.0, 0.7, 0.9, 0.0, 0.1, 0.2, 0.5, 0.0]
 TIME = 0
+SCORE = 0
+GAME_OVER = False
 START = False
 torus_pos_x = [1.0, -2.0, 3.0, -4.0, -2.0, 0.0, 2.0]
 torus_pos_y = [2.0, 3.0, 10.0, 6.0, 7.0, 4.0, 1.0]
+obstacle_passed = [False, False, False, False, False, False, False]
 
 rot = False
 start_time = time.time()
@@ -676,10 +679,37 @@ def shaheed_minar_env():
     glPopMatrix()
 
 
+def check_collision(plane_x: float, plane_y: float, plane_z: float,
+                     obs_x: float, obs_y: float, obs_z: float) -> bool:
+    """Check if plane collides with obstacle (torus)"""
+    # Calculate distance between plane center and obstacle center
+    dx = plane_x - obs_x
+    dy = (plane_y + 1.0) - obs_y  # plane_y + 1.0 accounts for plane's Y offset
+    dz = plane_z - obs_z
+
+    distance = math.sqrt(dx*dx + dy*dy + dz*dz)
+
+    # Torus outer radius is approximately 1.2 units (3 * 0.3 scale + inner radius)
+    # Plane has approximate radius of 1.2 units
+    collision_threshold = 1.8
+
+    return distance < collision_threshold
+
+
+def check_passed_obstacle(obs_z: float, prev_passed: bool) -> bool:
+    """Check if obstacle has just passed the plane"""
+    # Obstacle passes the plane when it moves from behind (negative z) to in front (positive z)
+    # The plane is at z=0 in world space, obstacles move forward (z increases)
+    # Count as passed when obstacle is in the narrow zone just after passing (0 < obs_z < 3)
+    if not prev_passed and 0 < obs_z < 3:
+        return True
+    return prev_passed
+
+
 def environment(n: int):
     """Draw the game environment with buildings"""
     global tola
-    
+
     # Ground
     glColor3d(0, 0.5, 0.1)
     glPushMatrix()
@@ -687,8 +717,8 @@ def environment(n: int):
     glScaled(EN_SIZE * 2, 0.3, EN_SIZE * 2)
     glutSolidCube(1)
     glPopMatrix()
-    
-    # Decorative torus
+
+    # Obstacle torus (ring to fly through)
     glColor3d(0, 1, 0.1)
     glPushMatrix()
     glTranslated(torus_pos_x[n], torus_pos_y[n], 0)
@@ -721,10 +751,14 @@ def environment(n: int):
 def draw():
     """Main drawing function"""
     global rotX, rotY, rotZ, tX, tY, tZ, tZ1, tZ2, tZ3, tZ4, tZ5, tZ6, speed, TIME
-    
+    global SCORE, GAME_OVER, obstacle_passed
+
+    if GAME_OVER:
+        return
+
     t = (time.time() - start_time)
     TIME = int(t)
-    
+
     # Plane rotation limits
     if rotX > 11:
         rotX = 11
@@ -837,6 +871,56 @@ def draw():
     if speed >= 0.7:
         speed = 0.7
 
+    # Collision detection and scoring for obstacles
+    # Map environment zones to their indices: zone 2 (tZ), zone 3 (tZ2), zone 1 (tZ3), zone 5 (tZ4), zone 4 (tZ5), zone 2 (tZ6)
+    obstacle_zones = [
+        (2, tZ),
+        (3, tZ2),
+        (1, tZ3),
+        (5, tZ4),
+        (4, tZ5),
+        (2, tZ6)
+    ]
+
+    for idx, (zone_num, zone_z) in enumerate(obstacle_zones):
+        if zone_num == 2 or zone_num == 3 or zone_num == 1 or zone_num == 5 or zone_num == 4:
+            # Calculate obstacle world position
+            obs_world_x = torus_pos_x[zone_num] + tX
+            obs_world_y = torus_pos_y[zone_num] + tY
+            obs_world_z = zone_z
+
+            # Plane is at world position (0, 1, 0) in camera space
+            plane_world_x = 0
+            plane_world_y = 1
+            plane_world_z = 0
+
+            # Check collision
+            if check_collision(plane_world_x, plane_world_y, plane_world_z,
+                             obs_world_x, obs_world_y, obs_world_z):
+                GAME_OVER = True
+                return
+
+            # Check if obstacle is passed to increment score
+            # obs_world_z is the obstacle's current z position in world space
+            if check_passed_obstacle(obs_world_z, obstacle_passed[idx]):
+                if not obstacle_passed[idx]:
+                    SCORE += 1
+                    obstacle_passed[idx] = True
+
+    # Reset obstacle_passed flags when obstacles loop back
+    if tZ <= -110:
+        obstacle_passed[0] = False
+    if tZ2 <= -110:
+        obstacle_passed[1] = False
+    if tZ3 <= -110:
+        obstacle_passed[2] = False
+    if tZ4 <= -110:
+        obstacle_passed[3] = False
+    if tZ5 <= -110:
+        obstacle_passed[4] = False
+    if tZ6 <= -110:
+        obstacle_passed[5] = False
+
 
 def draw_stroke_text(text: str, x: float, y: float, z: float):
     """Draw stroke text"""
@@ -874,22 +958,67 @@ def draw_stroke_char(char: str, x: float, y: float, z: float):
 def display():
     """Display callback function"""
     global angle
-    
+
     t = (time.time() - start_time)
     a = t * 90.0
     aa = a
-    
+
     if not rot:
         a = 0
-    
+
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
     glLoadIdentity()
-    
+
     gluLookAt(0.0, 4.5, 10.0,
               0, 4, 0,
               0, 1.0, 0.0)
-    
-    if START:
+
+    if GAME_OVER:
+        # Display game over screen
+        glPushMatrix()
+        glTranslated(0, 3, 0)
+        glRotated(aa, 0, 1, 0)
+        glScaled(1.5, 1.5, 1.5)
+        plane()
+        glPopMatrix()
+
+        draw_stroke_text2("GAME OVER", -2, 0.5, 0)
+        draw_stroke_text("Press G to Restart or M for Main Menu", -3.5, -1, 0)
+
+        # Display final score and time
+        draw_stroke_text("TIME : ", -1, -1.5, 0)
+        time_val = TIME
+        digits = []
+        if time_val == 0:
+            digits.append(0)
+        else:
+            while time_val > 0:
+                digits.append(time_val % 10)
+                time_val //= 10
+            digits.reverse()
+
+        tmp = 0.0
+        for digit in digits:
+            draw_stroke_char(str(digit), 0.0 + tmp, -1.5, 0)
+            tmp += 0.2
+
+        draw_stroke_text("SCORE : ", -1, -2, 0)
+        score_val = SCORE
+        score_digits = []
+        if score_val == 0:
+            score_digits.append(0)
+        else:
+            while score_val > 0:
+                score_digits.append(score_val % 10)
+                score_val //= 10
+            score_digits.reverse()
+
+        tmp = 0.0
+        for digit in score_digits:
+            draw_stroke_char(str(digit), 0.3 + tmp, -2, 0)
+            tmp += 0.2
+
+    elif START:
         glPushMatrix()
         glTranslated(0, 0, 0)
         glScaled(zoom, zoom, zoom)
@@ -915,6 +1044,25 @@ def display():
         for digit in digits:
             draw_stroke_char(str(digit), 4 + tmp, 0, 0)
             tmp += 0.2
+
+        # Draw score below time
+        draw_stroke_text("SCORE : ", 3, -0.5, 0)
+
+        # Draw score digits
+        score_val = SCORE
+        score_digits = []
+        if score_val == 0:
+            score_digits.append(0)
+        else:
+            while score_val > 0:
+                score_digits.append(score_val % 10)
+                score_val //= 10
+            score_digits.reverse()  # Reverse to show correct order
+
+        tmp = 0.0
+        for digit in score_digits:
+            draw_stroke_char(str(digit), 4.3 + tmp, -0.5, 0)
+            tmp += 0.2
     else:
         glPushMatrix()
         glTranslated(0, 3, 0)
@@ -929,14 +1077,30 @@ def display():
     glutSwapBuffers()
 
 
+def reset_game():
+    """Reset all game variables"""
+    global tX, tY, tZ, tZ1, tZ2, tZ3, tZ4, tZ5, tZ6
+    global rotX, rotY, rotZ, speed, TIME, SCORE, GAME_OVER, obstacle_passed, start_time
+
+    tX, tY, tZ = 0.0, 0.0, -8.0
+    tZ1, tZ2, tZ3, tZ4, tZ5, tZ6 = -20.0, -40.0, -60.0, -80.0, -100.0, -120.0
+    rotX, rotY, rotZ = 0.0, 0.0, 0.0
+    speed = 0.3
+    TIME = 0
+    SCORE = 0
+    GAME_OVER = False
+    obstacle_passed = [False, False, False, False, False, False, False]
+    start_time = time.time()
+
+
 def key(key_char: bytes, x: int, y: int):
     """Keyboard callback function"""
     global zoom, tY, tX, rotX, rotY, rotZ, START, rot
-    
+
     key_str = key_char.decode('utf-8')
     frac = 0.3
     rot_frac = 1.0
-    
+
     if key_str == '\x1b' or key_str == 'q':  # ESC or 'q'
         sys.exit(0)
     elif key_str == 'r':
@@ -948,10 +1112,12 @@ def key(key_char: bytes, x: int, y: int):
     elif key_str == '-' or key_str == '_':
         zoom -= 0.05
     elif key_str == 'g':
+        reset_game()
         START = True
     elif key_str == 'm':
+        reset_game()
         START = False
-    
+
     glutPostRedisplay()
 
 
@@ -1012,8 +1178,17 @@ high_shininess = [100.0]
 def main():
     """Main entry point"""
     glutInit(sys.argv)
-    glutInitWindowPosition(0, 0)
-    glutInitWindowSize(1366, 720)
+
+    # Center the window on display
+    window_width = 1366
+    window_height = 720
+    screen_width = glutGet(GLUT_SCREEN_WIDTH)
+    screen_height = glutGet(GLUT_SCREEN_HEIGHT)
+    window_x = (screen_width - window_width) // 2
+    window_y = (screen_height - window_height) // 2
+
+    glutInitWindowPosition(window_x, window_y)
+    glutInitWindowSize(window_width, window_height)
     glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE | GLUT_DEPTH | GLUT_RGBA)
     
     glutCreateWindow(b"Plane Game 3D")
