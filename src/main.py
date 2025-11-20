@@ -51,12 +51,15 @@ TIME = 0
 SCORE = 0
 GAME_OVER = False
 START = False
+PAUSED = False
 torus_pos_x = [1.0, -2.0, 3.0, -4.0, -2.0, 0.0, 2.0]
 torus_pos_y = [2.0, 3.0, 10.0, 6.0, 7.0, 4.0, 1.0]
 obstacle_passed = [False, False, False, False, False, False, False]
 
 rot = False
 start_time = time.time()
+pause_start_time = 0.0
+total_pause_time = 0.0
 
 
 def resize(width: int, height: int):
@@ -751,12 +754,12 @@ def environment(n: int):
 def draw():
     """Main drawing function"""
     global rotX, rotY, rotZ, tX, tY, tZ, tZ1, tZ2, tZ3, tZ4, tZ5, tZ6, speed, TIME
-    global SCORE, GAME_OVER, obstacle_passed
+    global SCORE, GAME_OVER, obstacle_passed, PAUSED, total_pause_time
 
     if GAME_OVER:
         return
 
-    t = (time.time() - start_time)
+    t = (time.time() - start_time - total_pause_time)
     TIME = int(t)
 
     # Plane rotation limits
@@ -826,6 +829,10 @@ def draw():
     glTranslated(tX, tY, tZ6)
     environment(2)
     glPopMatrix()
+    
+    # Skip all game updates when paused
+    if PAUSED:
+        return
     
     # Update z positions
     tZ += speed
@@ -1026,7 +1033,11 @@ def display():
         draw()
         glPopMatrix()
         
-        draw_stroke_text("ARROW KEYS: Move Plane, +/- or Mouse Wheel: Zoom, MAIN MENU: M", -8, 0.9, 0)
+        draw_stroke_text("ARROW KEYS: Move Plane, +/- or Mouse Wheel: Zoom, SPACE: Pause, MAIN MENU: M", -8, 0.9, 0)
+        
+        # Display PAUSED indicator
+        if PAUSED:
+            draw_stroke_text2("PAUSED", -1, 2, 0)
         draw_stroke_text("TIME : ", 3, 0, 0)
 
         # Draw time digits
@@ -1080,7 +1091,8 @@ def display():
 def reset_game():
     """Reset all game variables"""
     global tX, tY, tZ, tZ1, tZ2, tZ3, tZ4, tZ5, tZ6
-    global rotX, rotY, rotZ, speed, TIME, SCORE, GAME_OVER, obstacle_passed, start_time
+    global rotX, rotY, rotZ, speed, TIME, SCORE, GAME_OVER, obstacle_passed, start_time, PAUSED
+    global pause_start_time, total_pause_time
 
     tX, tY, tZ = 0.0, 0.0, -8.0
     tZ1, tZ2, tZ3, tZ4, tZ5, tZ6 = -20.0, -40.0, -60.0, -80.0, -100.0, -120.0
@@ -1089,13 +1101,17 @@ def reset_game():
     TIME = 0
     SCORE = 0
     GAME_OVER = False
+    PAUSED = False
+    pause_start_time = 0.0
+    total_pause_time = 0.0
     obstacle_passed = [False, False, False, False, False, False, False]
     start_time = time.time()
 
 
 def key(key_char: bytes, x: int, y: int):
     """Keyboard callback function"""
-    global zoom, tY, tX, rotX, rotY, rotZ, START, rot
+    global zoom, tY, tX, rotX, rotY, rotZ, START, rot, PAUSED
+    global pause_start_time, total_pause_time
 
     key_str = key_char.decode('utf-8')
     frac = 0.3
@@ -1103,6 +1119,15 @@ def key(key_char: bytes, x: int, y: int):
 
     if key_str == '\x1b' or key_str == 'q':  # ESC or 'q'
         sys.exit(0)
+    elif key_str == ' ':  # Space bar
+        if not PAUSED:
+            # Starting pause
+            pause_start_time = time.time()
+            PAUSED = True
+        else:
+            # Ending pause
+            total_pause_time += time.time() - pause_start_time
+            PAUSED = False
     elif key_str == 'r':
         rot = True
     elif key_str == 't':
