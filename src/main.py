@@ -58,13 +58,11 @@ total_pause_time = 0.0
 
 # Cloud positions: each cloud has [x, y, z, scale]
 # X: random horizontal position, Y: height, Z: depth (moves like buildings)
+# Increased cloud density for better visual effect
+NUM_CLOUDS = 20
 cloud_data = [
-    [random.uniform(-40, 40), random.uniform(20, 45), -30.0, random.uniform(2.0, 5.0)],
-    [random.uniform(-40, 40), random.uniform(20, 45), -50.0, random.uniform(2.0, 5.0)],
-    [random.uniform(-40, 40), random.uniform(20, 45), -70.0, random.uniform(2.0, 5.0)],
-    [random.uniform(-40, 40), random.uniform(20, 45), -90.0, random.uniform(2.0, 5.0)],
-    [random.uniform(-40, 40), random.uniform(20, 45), -110.0, random.uniform(2.0, 5.0)],
-    [random.uniform(-40, 40), random.uniform(20, 45), -130.0, random.uniform(2.0, 5.0)],
+    [random.uniform(-50, 50), random.uniform(18, 50), -10.0 - i * 5.0, random.uniform(1.5, 6.0)]
+    for i in range(NUM_CLOUDS)
 ]
 
 # Vehicle data: each vehicle has [x, z, direction, speed, color_index]
@@ -78,6 +76,9 @@ TREES_GENERATED = False
 
 # Glow animation time
 glow_time = 0.0
+
+# Blink time for radio tower lights
+blink_time = 0.0
 
 
 def resize(width: int, height: int):
@@ -693,6 +694,267 @@ def draw_trees():
         draw_single_tree(x, y, z, scale)
 
 
+def draw_radio_tower(x: float, y: float, z: float, scale: float = 1.0):
+    """Draw a radio/communication tower with blinking red lights"""
+    global blink_time
+    
+    glPushMatrix()
+    glTranslated(x, y, z)
+    glScaled(scale, scale, scale)
+    
+    # Tower base - concrete foundation
+    glColor3f(0.5, 0.5, 0.5)
+    glPushMatrix()
+    glTranslated(0, 0.1, 0)
+    glScaled(0.8, 0.2, 0.8)
+    glutSolidCube(1)
+    glPopMatrix()
+    
+    # Main tower structure - lattice frame (using lines and thin cubes)
+    tower_height = 8.0
+    tower_width = 0.6
+    
+    # Four corner posts - red/white pattern
+    for dx, dz in [(-1, -1), (-1, 1), (1, -1), (1, 1)]:
+        px = dx * tower_width / 2
+        pz = dz * tower_width / 2
+        
+        # Alternating red and white sections
+        section_height = tower_height / 8
+        for i in range(8):
+            if i % 2 == 0:
+                glColor3f(0.9, 0.1, 0.1)  # Red
+            else:
+                glColor3f(1.0, 1.0, 1.0)  # White
+            
+            glPushMatrix()
+            glTranslated(px * (1 - i * 0.08), 0.2 + section_height * i + section_height / 2, pz * (1 - i * 0.08))
+            glScaled(0.08, section_height, 0.08)
+            glutSolidCube(1)
+            glPopMatrix()
+    
+    # Cross braces - gray metal
+    glColor3f(0.4, 0.4, 0.45)
+    for height_level in range(1, 8):
+        h = 0.2 + height_level * (tower_height / 8)
+        taper = 1 - height_level * 0.08
+        hw = tower_width * taper / 2
+        
+        # Horizontal braces (X pattern on each side)
+        for side in range(4):
+            glPushMatrix()
+            glTranslated(0, h, 0)
+            glRotated(side * 90, 0, 1, 0)
+            glTranslated(0, 0, hw)
+            glScaled(hw * 2, 0.03, 0.03)
+            glutSolidCube(1)
+            glPopMatrix()
+    
+    # Top platform
+    glColor3f(0.3, 0.3, 0.35)
+    glPushMatrix()
+    glTranslated(0, tower_height + 0.2, 0)
+    glScaled(0.3, 0.05, 0.3)
+    glutSolidCube(1)
+    glPopMatrix()
+    
+    # Antenna mast on top
+    glColor3f(0.8, 0.8, 0.8)
+    glPushMatrix()
+    glTranslated(0, tower_height + 0.7, 0)
+    glScaled(0.04, 1.0, 0.04)
+    glutSolidCube(1)
+    glPopMatrix()
+    
+    # Blinking red lights - using blink_time for animation
+    blink_on = (int(blink_time * 2) % 2) == 0  # Blink every 0.5 seconds
+    
+    glDisable(GL_LIGHTING)
+    
+    if blink_on:
+        # Top light - brightest
+        glColor3f(1.0, 0.0, 0.0)
+        glPushMatrix()
+        glTranslated(0, tower_height + 1.3, 0)
+        glutSolidSphere(0.1, 12, 12)
+        glPopMatrix()
+        
+        # Glow effect around top light
+        glColor4f(1.0, 0.2, 0.2, 0.4)
+        glPushMatrix()
+        glTranslated(0, tower_height + 1.3, 0)
+        glutSolidSphere(0.2, 12, 12)
+        glPopMatrix()
+    else:
+        # Dim light when off
+        glColor3f(0.3, 0.0, 0.0)
+        glPushMatrix()
+        glTranslated(0, tower_height + 1.3, 0)
+        glutSolidSphere(0.08, 10, 10)
+        glPopMatrix()
+    
+    # Middle lights (blink opposite to top)
+    mid_blink = not blink_on
+    mid_height = tower_height * 0.5
+    
+    if mid_blink:
+        glColor3f(1.0, 0.0, 0.0)
+    else:
+        glColor3f(0.3, 0.0, 0.0)
+    
+    for dx, dz in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+        glPushMatrix()
+        glTranslated(dx * 0.2, mid_height + 0.2, dz * 0.2)
+        glutSolidSphere(0.06, 8, 8)
+        glPopMatrix()
+    
+    glEnable(GL_LIGHTING)
+    
+    glPopMatrix()
+
+
+def draw_national_parliament(x: float, y: float, z: float, scale: float = 1.0):
+    """Draw Bangladesh National Parliament building (Jatiya Sangsad Bhaban)
+    A modernist architectural masterpiece with geometric shapes"""
+    glPushMatrix()
+    glTranslated(x, y, z)
+    glScaled(scale, scale, scale)
+    
+    # Base platform - large concrete foundation
+    glColor3f(0.7, 0.68, 0.65)
+    glPushMatrix()
+    glTranslated(0, 0.15, 0)
+    glScaled(8, 0.3, 6)
+    glutSolidCube(1)
+    glPopMatrix()
+    
+    # Second level platform
+    glColor3f(0.72, 0.7, 0.67)
+    glPushMatrix()
+    glTranslated(0, 0.4, 0)
+    glScaled(7, 0.2, 5)
+    glutSolidCube(1)
+    glPopMatrix()
+    
+    # Main building blocks - characteristic geometric brutalist style
+    main_color = (0.75, 0.73, 0.7)  # Concrete gray
+    
+    # Central main hall - cylindrical core
+    glColor3f(*main_color)
+    glPushMatrix()
+    glTranslated(0, 2.5, 0)
+    glRotated(-90, 1, 0, 0)
+    glutSolidCylinder = lambda r, h, sl, st: _draw_cylinder(r, h, sl, st)
+    # Draw octagonal approximation of cylinder using cubes
+    for angle in range(0, 360, 45):
+        glPushMatrix()
+        glRotated(angle, 0, 1, 0)
+        glTranslated(1.2, 0, 0)
+        glScaled(0.8, 4.0, 1.5)
+        glutSolidCube(1)
+        glPopMatrix()
+    glPopMatrix()
+    
+    # Corner tower blocks - the iconic triangular/circular cutouts
+    tower_positions = [(-2.8, 1.5, -1.8), (2.8, 1.5, -1.8), (-2.8, 1.5, 1.8), (2.8, 1.5, 1.8)]
+    
+    for tx, ty, tz in tower_positions:
+        # Main tower block
+        glColor3f(0.73, 0.71, 0.68)
+        glPushMatrix()
+        glTranslated(tx, ty + 1.0, tz)
+        glScaled(1.8, 3.5, 1.5)
+        glutSolidCube(1)
+        glPopMatrix()
+        
+        # Circular cutout effect (dark inset)
+        glColor3f(0.2, 0.2, 0.22)
+        glPushMatrix()
+        glTranslated(tx, ty + 1.5, tz + 0.76 * (1 if tz > 0 else -1))
+        glScaled(0.8, 1.5, 0.1)
+        glutSolidSphere(1, 16, 16)
+        glPopMatrix()
+        
+        # Triangular cutout (geometric pattern)
+        glPushMatrix()
+        glTranslated(tx + 0.91 * (1 if tx > 0 else -1), ty + 0.8, tz)
+        glRotated(90 if tx > 0 else -90, 0, 1, 0)
+        glScaled(0.6, 1.2, 0.1)
+        _draw_triangle()
+        glPopMatrix()
+    
+    # Side wing buildings
+    for side in [-1, 1]:
+        glColor3f(0.74, 0.72, 0.69)
+        # Long horizontal wings
+        glPushMatrix()
+        glTranslated(side * 1.5, 1.5, side * 2.5)
+        glScaled(3.5, 2.5, 1.2)
+        glutSolidCube(1)
+        glPopMatrix()
+        
+        # Window strips (dark horizontal bands)
+        glColor3f(0.15, 0.15, 0.18)
+        for i in range(3):
+            glPushMatrix()
+            glTranslated(side * 1.5, 1.0 + i * 0.7, side * 2.5 + side * 0.61)
+            glScaled(3.0, 0.15, 0.02)
+            glutSolidCube(1)
+            glPopMatrix()
+    
+    # Central dome/roof structure
+    glColor3f(0.68, 0.66, 0.63)
+    glPushMatrix()
+    glTranslated(0, 4.8, 0)
+    glScaled(2.5, 0.8, 2.5)
+    glutSolidSphere(1, 20, 20)
+    glPopMatrix()
+    
+    # Roof terrace level
+    glColor3f(0.7, 0.68, 0.65)
+    glPushMatrix()
+    glTranslated(0, 4.2, 0)
+    glScaled(3.5, 0.15, 3.5)
+    glutSolidCube(1)
+    glPopMatrix()
+    
+    # Reflecting pool in front (water)
+    glColor3f(0.2, 0.4, 0.6)
+    glPushMatrix()
+    glTranslated(0, 0.05, 4.5)
+    glScaled(6, 0.05, 2)
+    glutSolidCube(1)
+    glPopMatrix()
+    
+    # Water shimmer effect
+    glDisable(GL_LIGHTING)
+    glColor4f(0.4, 0.6, 0.8, 0.3)
+    glPushMatrix()
+    glTranslated(0, 0.08, 4.5)
+    glScaled(5.8, 0.01, 1.8)
+    glutSolidCube(1)
+    glPopMatrix()
+    glEnable(GL_LIGHTING)
+    
+    glPopMatrix()
+
+
+def _draw_triangle():
+    """Helper to draw a simple triangle shape for parliament cutouts"""
+    glBegin(GL_TRIANGLES)
+    glVertex3f(0, 1, 0)
+    glVertex3f(-0.8, -1, 0)
+    glVertex3f(0.8, -1, 0)
+    glEnd()
+
+
+def _draw_cylinder(radius: float, height: float, slices: int, stacks: int):
+    """Helper to draw a cylinder"""
+    quad = gluNewQuadric()
+    gluCylinder(quad, radius, radius, height, slices, stacks)
+    gluDeleteQuadric(quad)
+
+
 def plane():
     """Draw the airplane"""
     # Main body
@@ -1086,7 +1348,7 @@ def check_passed_obstacle(obs_z: float, prev_passed: bool) -> bool:
 
 
 def environment(n: int):
-    """Draw the game environment with buildings"""
+    """Draw the game environment with buildings and landmarks"""
     global tola
 
     # Ground - grass with slight variation
@@ -1114,6 +1376,29 @@ def environment(n: int):
     # Draw trees
     draw_trees()
     
+    # Add landmarks based on environment zone number
+    # Zone 1: Radio towers on both sides
+    if n == 1:
+        draw_radio_tower(-15, 0.15, -8, 1.2)
+        draw_radio_tower(15, 0.15, 6, 1.0)
+    
+    # Zone 2: Radio tower
+    elif n == 2:
+        draw_radio_tower(-14, 0.15, 5, 1.3)
+    
+    # Zone 3: National Parliament building
+    elif n == 3:
+        draw_national_parliament(-12, 0.15, -6, 0.8)
+    
+    # Zone 4: Radio tower
+    elif n == 4:
+        draw_radio_tower(14, 0.15, -5, 1.5)
+    
+    # Zone 5: Parliament on the other side
+    elif n == 5:
+        draw_national_parliament(12, 0.15, 5, 0.7)
+        draw_radio_tower(-14, 0.15, -3, 1.0)
+    
     # Buildings
     for i in range(-(EN_SIZE // 2) + 1, EN_SIZE // 2, 2):
         for j in range(-(EN_SIZE // 2) + 1, EN_SIZE // 2, 2):
@@ -1121,6 +1406,12 @@ def environment(n: int):
             idx_j = j + (EN_SIZE // 2) + 1
             
             if idx_i >= 5000 or idx_j >= 5000:
+                continue
+            
+            # Skip building placement where landmarks are
+            if n == 3 and i < -8 and -8 < j < -2:
+                continue
+            if n == 5 and i > 8 and 2 < j < 8:
                 continue
                 
             if tola[idx_i][idx_j] != 0:
@@ -1140,7 +1431,7 @@ def draw():
     """Main drawing function"""
     global rotX, rotY, rotZ, tX, tY, tZ, tZ1, tZ2, tZ3, tZ4, tZ5, tZ6, speed, TIME
     global SCORE, GAME_OVER, obstacle_passed, PAUSED, total_pause_time, shaheed_minar_passed
-    global cloud_data, glow_time
+    global cloud_data, glow_time, blink_time
 
     if GAME_OVER:
         return
@@ -1150,6 +1441,9 @@ def draw():
     
     # Update glow animation time
     glow_time = t
+    
+    # Update blink time for radio tower lights
+    blink_time = t
     
     # Initialize vehicles and trees if not done
     init_vehicles()
@@ -1508,7 +1802,7 @@ def reset_game():
     global tX, tY, tZ, tZ1, tZ2, tZ3, tZ4, tZ5, tZ6
     global rotX, rotY, rotZ, speed, TIME, SCORE, GAME_OVER, obstacle_passed, start_time, PAUSED
     global pause_start_time, total_pause_time, shaheed_minar_passed, cloud_data
-    global vehicle_data, tree_positions, TREES_GENERATED, glow_time
+    global vehicle_data, tree_positions, TREES_GENERATED, glow_time, blink_time
 
     tX, tY, tZ = 0.0, 0.0, -8.0
     tZ1, tZ2, tZ3, tZ4, tZ5, tZ6 = -20.0, -40.0, -60.0, -80.0, -100.0, -120.0
@@ -1524,6 +1818,7 @@ def reset_game():
     obstacle_passed = [False, False, False, False, False, False, False]
     start_time = time.time()
     glow_time = 0.0
+    blink_time = 0.0
     
     # Reset vehicles for new random positions
     vehicle_data = []
@@ -1534,12 +1829,8 @@ def reset_game():
     
     # Reset cloud positions with new random values
     cloud_data = [
-        [random.uniform(-40, 40), random.uniform(20, 45), -30.0, random.uniform(2.0, 5.0)],
-        [random.uniform(-40, 40), random.uniform(20, 45), -50.0, random.uniform(2.0, 5.0)],
-        [random.uniform(-40, 40), random.uniform(20, 45), -70.0, random.uniform(2.0, 5.0)],
-        [random.uniform(-40, 40), random.uniform(20, 45), -90.0, random.uniform(2.0, 5.0)],
-        [random.uniform(-40, 40), random.uniform(20, 45), -110.0, random.uniform(2.0, 5.0)],
-        [random.uniform(-40, 40), random.uniform(20, 45), -130.0, random.uniform(2.0, 5.0)],
+        [random.uniform(-50, 50), random.uniform(18, 50), -10.0 - i * 5.0, random.uniform(1.5, 6.0)]
+        for i in range(NUM_CLOUDS)
     ]
 
 
