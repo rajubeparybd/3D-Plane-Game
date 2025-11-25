@@ -19,15 +19,9 @@ from OpenGL.GLUT import *
 import math
 import random
 
-from .rgbpixmap import RGBPixmap
-
-
 # Constants
 RAD = math.pi / 180
 EN_SIZE = 20
-
-# Global variables
-pix = [RGBPixmap() for _ in range(6)]
 
 zoom = 4.0
 tola = [[0 for _ in range(5000)] for _ in range(5000)]
@@ -44,6 +38,7 @@ theta, slope = 0.0, 0.0
 speed = 0.3
 angle_back_frac = 0.2
 shaheed_minar_visible = False
+shaheed_minar_passed = False
 r = [0.1, 0.4, 0.0, 0.9, 0.2, 0.5, 0.0, 0.7, 0.5, 0.0]
 g = [0.2, 0.0, 0.4, 0.5, 0.2, 0.0, 0.3, 0.9, 0.0, 0.2]
 b = [0.4, 0.5, 0.0, 0.7, 0.9, 0.0, 0.1, 0.2, 0.5, 0.0]
@@ -60,6 +55,17 @@ rot = False
 start_time = time.time()
 pause_start_time = 0.0
 total_pause_time = 0.0
+
+# Cloud positions: each cloud has [x, y, z, scale]
+# X: random horizontal position, Y: height, Z: depth (moves like buildings)
+cloud_data = [
+    [random.uniform(-40, 40), random.uniform(20, 45), -30.0, random.uniform(2.0, 5.0)],
+    [random.uniform(-40, 40), random.uniform(20, 45), -50.0, random.uniform(2.0, 5.0)],
+    [random.uniform(-40, 40), random.uniform(20, 45), -70.0, random.uniform(2.0, 5.0)],
+    [random.uniform(-40, 40), random.uniform(20, 45), -90.0, random.uniform(2.0, 5.0)],
+    [random.uniform(-40, 40), random.uniform(20, 45), -110.0, random.uniform(2.0, 5.0)],
+    [random.uniform(-40, 40), random.uniform(20, 45), -130.0, random.uniform(2.0, 5.0)],
+]
 
 
 def resize(width: int, height: int):
@@ -474,31 +480,89 @@ def draw_shaheed_minar():
     glPopMatrix()
 
 
-def fan():
-    """Draw a fan/propeller"""
-    glColor3d(0.5, 1, 0)
+def draw_sky_gradient():
+    """Draw a sky gradient background - light cyan at horizon to deep blue at top"""
+    glDisable(GL_LIGHTING)
+    glDepthMask(GL_FALSE)  # Don't write to depth buffer
+    
     glPushMatrix()
-    glTranslated(0, 0, 0)
-    glScaled(1, 1, 0.7)
-    glutSolidSphere(0.8, 30, 30)
+    
+    # Draw a large quad far back with vertex colors for gradient
+    glBegin(GL_QUADS)
+    
+    # Bottom vertices - light cyan (horizon)
+    glColor3f(0.53, 0.81, 0.92)  # Light sky blue
+    glVertex3f(-800, -100, -600)
+    glVertex3f(800, -100, -600)
+    
+    # Top vertices - deeper blue (zenith)
+    glColor3f(0.25, 0.41, 0.88)  # Royal blue
+    glVertex3f(800, 600, -600)
+    glVertex3f(-800, 600, -600)
+    
+    glEnd()
+    
     glPopMatrix()
     
-    glColor3d(0.5, 1, 0)
+    glDepthMask(GL_TRUE)  # Re-enable depth writing
+    glEnable(GL_LIGHTING)
+
+
+def draw_single_cloud(x: float, y: float, z: float, scale: float):
+    """Draw a single cloud cluster using grouped spheres"""
     glPushMatrix()
-    glTranslated(0, 0, 0)
-    glRotated(5, 0, 1, 0)
-    glScaled(0.5, 2.5, 0.05)
-    glutSolidSphere(1, 30, 30)
+    glTranslated(x, y, z)
+    glScaled(scale, scale * 0.6, scale)
+    
+    glColor3f(1.0, 1.0, 1.0)
+    
+    # Main body
+    glutSolidSphere(1.0, 15, 15)
+    
+    # Left puff
+    glPushMatrix()
+    glTranslated(-0.8, 0.1, 0)
+    glutSolidSphere(0.7, 15, 15)
     glPopMatrix()
     
-    glColor3d(0.5, 1, 0)
+    # Right puff
     glPushMatrix()
-    glTranslated(0, 0, 0)
-    glRotated(-5, 0, 1, 0)
-    glRotated(90, 0, 0, 1)
-    glScaled(0.5, 2.5, 0.05)
-    glutSolidSphere(1, 30, 30)
+    glTranslated(0.9, 0.15, 0)
+    glutSolidSphere(0.75, 15, 15)
     glPopMatrix()
+    
+    # Top puff
+    glPushMatrix()
+    glTranslated(0.2, 0.5, 0)
+    glutSolidSphere(0.6, 15, 15)
+    glPopMatrix()
+    
+    # Front puff
+    glPushMatrix()
+    glTranslated(-0.3, 0.0, 0.5)
+    glutSolidSphere(0.55, 15, 15)
+    glPopMatrix()
+    
+    # Back puff
+    glPushMatrix()
+    glTranslated(0.4, 0.2, -0.4)
+    glutSolidSphere(0.5, 15, 15)
+    glPopMatrix()
+    
+    glPopMatrix()
+
+
+def draw_clouds():
+    """Draw multiple clouds scattered across the sky that move like buildings"""
+    global cloud_data
+    
+    glDisable(GL_LIGHTING)
+    
+    for cloud in cloud_data:
+        x, y, z, scale = cloud
+        draw_single_cloud(x, y, z, scale)
+    
+    glEnable(GL_LIGHTING)
 
 
 def plane():
@@ -754,7 +818,8 @@ def environment(n: int):
 def draw():
     """Main drawing function"""
     global rotX, rotY, rotZ, tX, tY, tZ, tZ1, tZ2, tZ3, tZ4, tZ5, tZ6, speed, TIME
-    global SCORE, GAME_OVER, obstacle_passed, PAUSED, total_pause_time
+    global SCORE, GAME_OVER, obstacle_passed, PAUSED, total_pause_time, shaheed_minar_passed
+    global cloud_data
 
     if GAME_OVER:
         return
@@ -800,10 +865,12 @@ def draw():
     environment(2)
     glPopMatrix()
     
-    glPushMatrix()
-    glTranslated(tX, tY, tZ1)
-    shaheed_minar_env()
-    glPopMatrix()
+    # Only render Shahid Minar if it hasn't passed yet
+    if not shaheed_minar_passed:
+        glPushMatrix()
+        glTranslated(tX, tY, tZ1)
+        shaheed_minar_env()
+        glPopMatrix()
     
     glPushMatrix()
     glTranslated(tX, tY, tZ2)
@@ -847,7 +914,7 @@ def draw():
     if tZ >= 20:
         tZ = -110
     if tZ1 >= 20:
-        tZ1 = -110
+        shaheed_minar_passed = True
     if tZ2 >= 20:
         tZ2 = -110
     if tZ3 >= 20:
@@ -858,6 +925,17 @@ def draw():
         tZ5 = -110
     if tZ6 >= 20:
         tZ6 = -110
+    
+    # Update cloud positions (move towards player like buildings)
+    for cloud in cloud_data:
+        cloud[2] += speed  # Update Z position
+        
+        # Reset cloud when it passes the player
+        if cloud[2] >= 20:
+            cloud[0] = random.uniform(-40, 40)  # New random X
+            cloud[1] = random.uniform(20, 45)   # New random Y (height)
+            cloud[2] = -130.0                    # Reset Z to far back
+            cloud[3] = random.uniform(2.0, 5.0) # New random scale
     
     # Rotation damping
     if rotX > 0:
@@ -980,8 +1058,10 @@ def display():
               0, 4, 0,
               0, 1.0, 0.0)
 
+    # Draw sky elements (background)
+    draw_sky_gradient()
+
     if GAME_OVER:
-        # Display game over screen
         glPushMatrix()
         glTranslated(0, 2, 0)
         glRotated(aa, 0, 1, 0)
@@ -1026,6 +1106,8 @@ def display():
             tmp += 0.2
 
     elif START:
+        draw_sky_gradient()
+        draw_clouds()
         glPushMatrix()
         glTranslated(0, 0, 0)
         glScaled(zoom, zoom, zoom)
@@ -1092,10 +1174,11 @@ def reset_game():
     """Reset all game variables"""
     global tX, tY, tZ, tZ1, tZ2, tZ3, tZ4, tZ5, tZ6
     global rotX, rotY, rotZ, speed, TIME, SCORE, GAME_OVER, obstacle_passed, start_time, PAUSED
-    global pause_start_time, total_pause_time
+    global pause_start_time, total_pause_time, shaheed_minar_passed, cloud_data
 
     tX, tY, tZ = 0.0, 0.0, -8.0
     tZ1, tZ2, tZ3, tZ4, tZ5, tZ6 = -20.0, -40.0, -60.0, -80.0, -100.0, -120.0
+    shaheed_minar_passed = False
     rotX, rotY, rotZ = 0.0, 0.0, 0.0
     speed = 0.3
     TIME = 0
@@ -1106,6 +1189,16 @@ def reset_game():
     total_pause_time = 0.0
     obstacle_passed = [False, False, False, False, False, False, False]
     start_time = time.time()
+    
+    # Reset cloud positions with new random values
+    cloud_data = [
+        [random.uniform(-40, 40), random.uniform(20, 45), -30.0, random.uniform(2.0, 5.0)],
+        [random.uniform(-40, 40), random.uniform(20, 45), -50.0, random.uniform(2.0, 5.0)],
+        [random.uniform(-40, 40), random.uniform(20, 45), -70.0, random.uniform(2.0, 5.0)],
+        [random.uniform(-40, 40), random.uniform(20, 45), -90.0, random.uniform(2.0, 5.0)],
+        [random.uniform(-40, 40), random.uniform(20, 45), -110.0, random.uniform(2.0, 5.0)],
+        [random.uniform(-40, 40), random.uniform(20, 45), -130.0, random.uniform(2.0, 5.0)],
+    ]
 
 
 def key(key_char: bytes, x: int, y: int):
@@ -1225,9 +1318,13 @@ def main():
     glutMouseFunc(mouse_wheel)
     glutIdleFunc(idle)
     
-    glClearColor(1, 1, 1, 1)
+    glClearColor(0.53, 0.81, 0.92, 1.0)  # Light sky blue fallback
     glEnable(GL_CULL_FACE)
     glCullFace(GL_BACK)
+    
+    # Enable blending for sun glow effect
+    glEnable(GL_BLEND)
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
     
     glEnable(GL_DEPTH_TEST)
     glDepthFunc(GL_LESS)
