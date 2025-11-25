@@ -844,7 +844,6 @@ def draw_national_parliament(x: float, y: float, z: float, scale: float = 1.0):
     glPushMatrix()
     glTranslated(0, 2.5, 0)
     glRotated(-90, 1, 0, 0)
-    glutSolidCylinder = lambda r, h, sl, st: _draw_cylinder(r, h, sl, st)
     # Draw octagonal approximation of cylinder using cubes
     for angle in range(0, 360, 45):
         glPushMatrix()
@@ -946,13 +945,6 @@ def _draw_triangle():
     glVertex3f(-0.8, -1, 0)
     glVertex3f(0.8, -1, 0)
     glEnd()
-
-
-def _draw_cylinder(radius: float, height: float, slices: int, stacks: int):
-    """Helper to draw a cylinder"""
-    quad = gluNewQuadric()
-    gluCylinder(quad, radius, radius, height, slices, stacks)
-    gluDeleteQuadric(quad)
 
 
 def plane():
